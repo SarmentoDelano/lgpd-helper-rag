@@ -4,7 +4,7 @@
 
 <!-- GIF de demo será adicionado ao final do projeto -->
 
-**Live demo:** Em desenvolvimento.
+**Live demo:** https://lgpd-apper-rag.streamlit.app
 
 ## Problem statement
 
