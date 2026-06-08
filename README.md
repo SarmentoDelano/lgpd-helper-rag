@@ -128,3 +128,12 @@ lgpd-helper-rag/
 | README | 30% | README com problema, setup, arquitetura, métricas e limites |
 | Custo | 20% | Redução de custo com cache ou routing |
 | Demo | 10% | URL pública funcionando |
+
+## Deploy
+
+O deploy foi planejado para o Streamlit Community Cloud.
+
+Arquivo principal:
+
+```bash
+src/ui/streamlit_app.py
