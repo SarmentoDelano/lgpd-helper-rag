@@ -1,21 +1,23 @@
-﻿[build-system]
+[build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "lgpd-helper-rag"
 version = "0.1.0"
-description = "Assistente RAG para dúvidas de compliance LGPD"
-requires-python = ">=3.10"
+description = "Assistente RAG para duvidas de compliance LGPD"
+requires-python = ">=3.10,<3.13"
 dependencies = [
     "streamlit",
     "python-dotenv",
     "pypdf",
     "chromadb",
-    "google-generativeai",
+    "openai",
     "numpy",
     "pandas",
     "pytest",
+    "requests",
+    "beautifulsoup4"
 ]
 
 [tool.setuptools.packages.find]
