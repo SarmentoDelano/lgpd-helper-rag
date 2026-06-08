@@ -14,15 +14,15 @@ from src.pipeline.routing import classify_complexity
 from src.pipeline.tools import cite_article, extract_article_number
 
 
-load_dotenv()
+load_dotenv(override=True)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CORPUS_DIR = ROOT_DIR / "data" / "corpus"
 VECTOR_DIR = ROOT_DIR / "data" / "chroma"
 VECTOR_STORE_FILE = VECTOR_DIR / "vector_store.json"
 
-XAI_BASE_URL = os.getenv("XAI_BASE_URL", "https://api.x.ai/v1")
-GENERATION_MODEL = os.getenv("GENERATION_MODEL", "grok-4.3")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+GENERATION_MODEL = os.getenv("GENERATION_MODEL", "openai/gpt-oss-20b")
 
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "800"))
 CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
@@ -33,17 +33,17 @@ EMBEDDING_DIM = 384
 CACHE = ExactCache()
 
 
-def _xai_client() -> OpenAI:
-    api_key = os.getenv("XAI_API_KEY")
+def _groq_client() -> OpenAI:
+    api_key = os.getenv("GROQ_API_KEY")
 
-    if not api_key or api_key == "coloque_sua_chave_xai_aqui":
+    if not api_key or api_key == "coloque_sua_chave_groq_aqui":
         raise RuntimeError(
-            "XAI_API_KEY não configurada. Preencha o arquivo .env com sua chave da xAI/Grok."
+            "GROQ_API_KEY não configurada. Preencha o arquivo .env com sua chave da Groq."
         )
 
     return OpenAI(
         api_key=api_key,
-        base_url=XAI_BASE_URL,
+        base_url=GROQ_BASE_URL,
     )
 
 
@@ -298,29 +298,72 @@ def _format_sources(docs: list[dict]) -> list[str]:
     return sources
 
 
-def _generate_answer(prompt: str) -> str:
-    client = _xai_client()
-
-    response = client.chat.completions.create(
-        model=GENERATION_MODEL,
-        temperature=0.2,
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "Você é o LGPD Helper, um assistente especializado em LGPD, "
-                    "RAG e dúvidas práticas de compliance."
-                ),
-            },
-            {
-                "role": "user",
-                "content": prompt,
-            },
-        ],
+def _fallback_answer_from_prompt(prompt: str) -> str:
+    tool_match = re.search(
+        r"Resultado da tool cite_article, se houver:\n(.*?)\n\nContexto recuperado pelo RAG:",
+        prompt,
+        flags=re.DOTALL,
     )
 
-    return response.choices[0].message.content
+    context_match = re.search(
+        r"Contexto recuperado pelo RAG:\n(.*?)\n\nResposta:",
+        prompt,
+        flags=re.DOTALL,
+    )
 
+    tool_context = tool_match.group(1).strip() if tool_match else ""
+    rag_context = context_match.group(1).strip() if context_match else ""
+
+    if tool_context and "Fonte: LGPD" in tool_context:
+        base = tool_context[:2200]
+        return (
+            "Não foi possível chamar o modelo Groq neste momento\n\n"
+            "Mesmo assim, a tool `cite_article` local encontrou o artigo solicitado no corpus da LGPD:\n\n"
+            f"{base}\n\n"
+            "Observação: esta resposta foi gerada em modo fallback local e não substitui orientação jurídica especializada."
+        )
+
+    if rag_context:
+        base = rag_context[:2200]
+        return (
+            "Não foi possível chamar o modelo Groq neste momento\n\n"
+            "Mesmo assim, o RAG local recuperou os seguintes trechos relevantes do corpus:\n\n"
+            f"{base}\n\n"
+            "Observação: esta resposta foi gerada em modo fallback local e não substitui orientação jurídica especializada."
+        )
+
+    return (
+        "Não foi possível chamar o modelo Groq neste momento e não encontrei contexto suficiente no corpus local. "
+        "Verifique os créditos da conta Groq ou tente novamente após configurar o billing."
+    )
+
+
+def _generate_answer(prompt: str) -> str:
+    try:
+        client = _groq_client()
+
+        response = client.chat.completions.create(
+            model=GENERATION_MODEL,
+            temperature=0.2,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Você é o LGPD Helper, um assistente especializado em LGPD, "
+                        "RAG e dúvidas práticas de compliance."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+        )
+
+        return response.choices[0].message.content
+
+    except Exception as error:
+        return _fallback_answer_from_prompt(prompt)
 
 def answer(question: str) -> dict:
     question = question.strip()
