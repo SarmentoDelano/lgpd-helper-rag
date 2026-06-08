@@ -49,29 +49,55 @@ streamlit run src/ui/streamlit_app.py
 
 ## Cost & Latency
 
-A preencher após os testes.
+O projeto implementa uma estratégia simples de redução de custo baseada em **exact cache**. Quando uma pergunta já foi respondida anteriormente, a resposta é recuperada do cache em memória, evitando uma nova chamada ao modelo LLM.
 
-| Estratégia | Custo total | Redução | P95 latency |
-|---|---:|---:|---:|
-| Baseline | A preencher | — | A preencher |
-| + Exact cache | A preencher | A preencher | A preencher |
-| + Routing cheap-first | A preencher | A preencher | A preencher |
+Benchmark realizado com 10 perguntas, sendo 5 perguntas únicas e 5 perguntas repetidas para testar o cache.
+
+| Estratégia         | Chamadas LLM | Redução | P95 latency |
+| ------------------ | -----------: | ------: | ----------: |
+| Baseline sem cache |  10 chamadas |       — |  2416.28 ms |
+| + Exact cache      |   5 chamadas |  50.00% |  2416.28 ms |
+
+Métricas observadas:
+
+* Total de perguntas: 10
+* Cache hits: 5
+* Cache misses: 5
+* Hit-rate: 50.00%
+* Redução estimada de chamadas LLM: 50.00%
+* Latência média: 856.15 ms
+* P95 latency: 2416.28 ms
+
+As perguntas repetidas foram respondidas com latência próxima de 0 ms, demonstrando que o cache evita chamadas desnecessárias ao LLM.
 
 ## Design decisions
 
-A preencher após implementação.
+* O corpus foi composto por documentos oficiais da LGPD e da ANPD, priorizando fontes institucionais e relevantes para dúvidas práticas de compliance.
+* A aplicação usa RAG para recuperar trechos do corpus antes de gerar a resposta, reduzindo o risco de respostas genéricas ou sem base documental.
+* A tool `cite_article` foi criada para consultar artigos específicos da LGPD diretamente no corpus local, evitando que o modelo invente números ou conteúdos de artigos.
+* A primeira versão usava Chroma como vector store, mas a solução final usa um vector store local em JSON com embeddings por hashing, evitando problemas de compatibilidade com `onnxruntime` no Windows e simplificando o deploy.
+* O cache exato foi escolhido como estratégia inicial de redução de custo por ser simples, transparente e suficiente para demonstrar redução de chamadas ao LLM.
+* O modelo de geração usa a API da Groq com o modelo `openai/gpt-oss-20b`, por oferecer boa velocidade e facilidade de uso em projetos acadêmicos.
 
 ## Limitations
 
-A preencher após implementação.
+* O corpus é fixo e não permite upload de novos documentos pela interface.
+* O sistema não substitui orientação jurídica especializada; as respostas devem ser usadas apenas como apoio inicial.
+* O embedding local baseado em hashing é simples e pode ter menor qualidade semântica do que embeddings comerciais especializados.
+* O cache atual é mantido em memória, então é reiniciado quando a aplicação é reiniciada.
+* A qualidade da resposta depende da qualidade dos trechos recuperados pelo RAG e da cobertura dos documentos presentes no corpus.
 
 ## Tech stack
 
-- **LLM:** Gemini
-- **Embeddings:** Google Embeddings
-- **Vector store:** Chroma
-- **UI:** Streamlit
-- **Deploy:** Streamlit Community Cloud
+* **LLM:** Groq API com modelo `openai/gpt-oss-20b`
+* **RAG:** recuperação local sobre corpus LGPD/ANPD
+* **Embeddings:** embedding local baseado em hashing
+* **Vector store:** JSON local com similaridade cosseno
+* **Tool-use:** função `cite_article` para consulta direta a artigos da LGPD
+* **Cache:** exact cache em memória
+* **UI:** Streamlit
+* **Deploy:** Streamlit Community Cloud
+
 
 ## Estrutura
 
